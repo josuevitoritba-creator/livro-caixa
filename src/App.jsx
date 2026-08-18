@@ -54,6 +54,29 @@ const dataComHoraAtual = (dataStr) => {
   ).toISOString();
 };
 
+const trocarDataMantendoHora = (isoOriginal, novaData) => {
+  const original = isoOriginal ? new Date(isoOriginal) : new Date();
+  const [y, m, d] = novaData.split("-").map(Number);
+  return new Date(
+    y,
+    m - 1,
+    d,
+    original.getHours(),
+    original.getMinutes(),
+    original.getSeconds(),
+    original.getMilliseconds()
+  ).toISOString();
+};
+
+const dataLocalDeISO = (iso) => {
+  if (!iso) return hojeLocalISO();
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dia}`;
+};
+
 async function hashSenha(senha) {
   try {
     const enc = new TextEncoder().encode(senha);
@@ -127,6 +150,14 @@ export default function App() {
   const [valor, setValor] = useState("");
   const [origem, setOrigem] = useState(ORIGENS[0]);
   const [dataLancamento, setDataLancamento] = useState(hojeLocalISO());
+
+  const [editandoId, setEditandoId] = useState(null);
+  const [editCaixa, setEditCaixa] = useState("");
+  const [editValor, setEditValor] = useState("");
+  const [editOrigem, setEditOrigem] = useState(ORIGENS[0]);
+  const [editData, setEditData] = useState("");
+  const [erroEdicao, setErroEdicao] = useState("");
+  const [excluirConfirmId, setExcluirConfirmId] = useState(null);
 
   const [filtroCaixa, setFiltroCaixa] = useState("Todos");
   const [filtroOrigem, setFiltroOrigem] = useState("Todos");
@@ -377,6 +408,42 @@ export default function App() {
     });
   }
 
+  function iniciarEdicao(r) {
+    setEditandoId(r.id);
+    setEditCaixa(r.caixa);
+    setEditValor(String(r.valor));
+    setEditOrigem(r.origem);
+    setEditData(dataLocalDeISO(r.registradoEm));
+    setErroEdicao("");
+  }
+
+  function cancelarEdicao() {
+    setEditandoId(null);
+    setErroEdicao("");
+  }
+
+  async function salvarEdicao(e, registro) {
+    e.preventDefault();
+    const nome = editCaixa.trim();
+    if (!nome || !editValor || Number(editValor) <= 0 || !editData) {
+      setErroEdicao("Preencha caixa, valor e data corretamente.");
+      return;
+    }
+    await updateDoc(doc(db, "registros", registro.id), {
+      caixa: nome,
+      valor: Number(editValor),
+      origem: editOrigem,
+      registradoEm: trocarDataMantendoHora(registro.registradoEm, editData),
+    });
+    setEditandoId(null);
+    setErroEdicao("");
+  }
+
+  async function excluirRegistro(id) {
+    await deleteDoc(doc(db, "registros", id));
+    setExcluirConfirmId(null);
+  }
+
   async function confirmarConferencia() {
     if (registrosSelecionados.length === 0) return;
     const batch = writeBatch(db);
@@ -496,6 +563,105 @@ export default function App() {
     background: o === "Troco" ? "#dbe6df" : "#f0ddc4",
     color: o === "Troco" ? "#2f5240" : "#7a4d1f",
   });
+
+  function formEdicaoRegistro(r) {
+    return (
+      <form onSubmit={(e) => salvarEdicao(e, r)}>
+        <label style={label}>Caixa</label>
+        <input style={input} value={editCaixa} onChange={(e) => setEditCaixa(e.target.value)} />
+        <label style={label}>Valor</label>
+        <input
+          style={input}
+          type="number"
+          min="0"
+          step="0.01"
+          value={editValor}
+          onChange={(e) => setEditValor(e.target.value)}
+        />
+        <label style={label}>Origem</label>
+        <select style={input} value={editOrigem} onChange={(e) => setEditOrigem(e.target.value)}>
+          {ORIGENS.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+        <label style={label}>Data do lançamento</label>
+        <input style={input} type="date" value={editData} onChange={(e) => setEditData(e.target.value)} />
+        {erroEdicao && <p style={{ color: "#8a1f1f", fontSize: "13px", marginTop: "-8px" }}>{erroEdicao}</p>}
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button style={btnPrimary} type="submit">
+            Salvar
+          </button>
+          <button
+            type="button"
+            onClick={cancelarEdicao}
+            style={{ ...btnPrimary, background: "#fff", color: "#1f3d33", border: "1px solid #1f3d33" }}
+          >
+            Cancelar
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  function botoesAdminRegistro(r) {
+    if (!currentUser.admin) return null;
+    return (
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "10px" }}>
+        <button
+          type="button"
+          onClick={() => iniciarEdicao(r)}
+          style={{
+            ...btnPrimary,
+            background: "#fff",
+            color: "#1f3d33",
+            border: "1px solid #1f3d33",
+            padding: "7px 12px",
+            fontSize: "12px",
+          }}
+        >
+          Editar
+        </button>
+        {excluirConfirmId === r.id ? (
+          <>
+            <button type="button" onClick={() => excluirRegistro(r.id)} style={{ ...btnStamp, padding: "7px 12px" }}>
+              Confirmar exclusão
+            </button>
+            <button
+              type="button"
+              onClick={() => setExcluirConfirmId(null)}
+              style={{
+                ...btnPrimary,
+                background: "#fff",
+                color: "#1f3d33",
+                border: "1px solid #1f3d33",
+                padding: "7px 12px",
+                fontSize: "12px",
+              }}
+            >
+              Cancelar
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setExcluirConfirmId(r.id)}
+            style={{
+              ...btnPrimary,
+              background: "#fff",
+              color: "#8a1f1f",
+              border: "1px solid #8a1f1f",
+              padding: "7px 12px",
+              fontSize: "12px",
+            }}
+          >
+            Excluir
+          </button>
+        )}
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -819,17 +985,24 @@ export default function App() {
             )}
             {pendentes.map((r) => (
               <div key={r.id} style={card}>
-                <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>{r.caixa}</p>
-                <p style={{ margin: "0 0 6px", fontFamily: "'Courier New', monospace", fontSize: "20px" }}>
-                  {fmtMoney(r.valor)}
-                </p>
-                <span style={tagOrigem(r.origem)}>{r.origem}</span>
-                <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px", marginBottom: "12px" }}>
-                  Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
-                </p>
-                <button style={btnStamp} onClick={() => darRecebido(r.id)}>
-                  DAR RECEBIDO
-                </button>
+                {editandoId === r.id ? (
+                  formEdicaoRegistro(r)
+                ) : (
+                  <>
+                    <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>{r.caixa}</p>
+                    <p style={{ margin: "0 0 6px", fontFamily: "'Courier New', monospace", fontSize: "20px" }}>
+                      {fmtMoney(r.valor)}
+                    </p>
+                    <span style={tagOrigem(r.origem)}>{r.origem}</span>
+                    <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px", marginBottom: "12px" }}>
+                      Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
+                    </p>
+                    <button style={btnStamp} onClick={() => darRecebido(r.id)}>
+                      DAR RECEBIDO
+                    </button>
+                    {botoesAdminRegistro(r)}
+                  </>
+                )}
               </div>
             ))}
           </>
@@ -844,17 +1017,24 @@ export default function App() {
             )}
             {recebidos.map((r) => (
               <div key={r.id} style={{ ...card, overflow: "hidden" }}>
-                <Stamp />
-                <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>{r.caixa}</p>
-                <p style={{ margin: "0 0 6px", fontFamily: "'Courier New', monospace", fontSize: "20px" }}>
-                  {fmtMoney(r.valor)}
-                </p>
-                <span style={tagOrigem(r.origem)}>{r.origem}</span>
-                <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px" }}>
-                  Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
-                  <br />
-                  Recebido por <strong>{r.recebidoPor}</strong> em {fmtDateTime(r.recebidoEm)}
-                </p>
+                {editandoId === r.id ? (
+                  formEdicaoRegistro(r)
+                ) : (
+                  <>
+                    <Stamp />
+                    <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>{r.caixa}</p>
+                    <p style={{ margin: "0 0 6px", fontFamily: "'Courier New', monospace", fontSize: "20px" }}>
+                      {fmtMoney(r.valor)}
+                    </p>
+                    <span style={tagOrigem(r.origem)}>{r.origem}</span>
+                    <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px" }}>
+                      Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
+                      <br />
+                      Recebido por <strong>{r.recebidoPor}</strong> em {fmtDateTime(r.recebidoEm)}
+                    </p>
+                    {botoesAdminRegistro(r)}
+                  </>
+                )}
               </div>
             ))}
           </>
