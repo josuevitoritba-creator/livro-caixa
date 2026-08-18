@@ -32,6 +32,28 @@ const fmtDateTime = (iso) => {
   });
 };
 
+const hojeLocalISO = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dia}`;
+};
+
+const dataComHoraAtual = (dataStr) => {
+  const agora = new Date();
+  const [y, m, d] = dataStr.split("-").map(Number);
+  return new Date(
+    y,
+    m - 1,
+    d,
+    agora.getHours(),
+    agora.getMinutes(),
+    agora.getSeconds(),
+    agora.getMilliseconds()
+  ).toISOString();
+};
+
 async function hashSenha(senha) {
   try {
     const enc = new TextEncoder().encode(senha);
@@ -104,6 +126,7 @@ export default function App() {
   const [caixaCustom, setCaixaCustom] = useState("");
   const [valor, setValor] = useState("");
   const [origem, setOrigem] = useState(ORIGENS[0]);
+  const [dataLancamento, setDataLancamento] = useState(hojeLocalISO());
 
   const [filtroCaixa, setFiltroCaixa] = useState("Todos");
   const [filtroOrigem, setFiltroOrigem] = useState("Todos");
@@ -324,12 +347,16 @@ export default function App() {
       setErro("Preencha o caixa e um valor válido.");
       return;
     }
+    if (!dataLancamento) {
+      setErro("Selecione a data do lançamento.");
+      return;
+    }
     await addDoc(collection(db, "registros"), {
       caixa: nomeFinal,
       valor: Number(valor),
       origem,
       registradoPor: currentUser.nome,
-      registradoEm: new Date().toISOString(),
+      registradoEm: dataComHoraAtual(dataLancamento),
       status: "pendente",
       recebidoPor: null,
       recebidoEm: null,
@@ -337,6 +364,7 @@ export default function App() {
     setValor("");
     setCaixaCustom("");
     setOrigem(ORIGENS[0]);
+    setDataLancamento(hojeLocalISO());
     setErro("");
     setTab("pendentes");
   }
@@ -708,6 +736,13 @@ export default function App() {
                 </option>
               ))}
             </select>
+            <label style={label}>Data do lançamento</label>
+            <input
+              style={input}
+              type="date"
+              value={dataLancamento}
+              onChange={(e) => setDataLancamento(e.target.value)}
+            />
             {erro && <p style={{ color: "#8a1f1f", fontSize: "13px", marginTop: "-8px" }}>{erro}</p>}
             <button style={btnPrimary} type="submit">
               Registrar
