@@ -85,6 +85,12 @@ export default function App() {
   const [loginSenha, setLoginSenha] = useState("");
   const [erro, setErro] = useState("");
   const [erroLogin, setErroLogin] = useState("");
+
+  const [novoNomeUser, setNovoNomeUser] = useState("");
+  const [novaSenhaUser, setNovaSenhaUser] = useState("");
+  const [novoUserAdmin, setNovoUserAdmin] = useState(false);
+  const [erroNovoUsuario, setErroNovoUsuario] = useState("");
+  const [okNovoUsuario, setOkNovoUsuario] = useState("");
   const [tab, setTab] = useState("pendentes");
 
   const [mostrarAlterarSenha, setMostrarAlterarSenha] = useState(false);
@@ -249,6 +255,27 @@ export default function App() {
     setNovaSenha("");
     setErro("");
     setCurrentUser({ id: ref.id, ...novo });
+  }
+
+  async function criarUsuario(e) {
+    e.preventDefault();
+    setOkNovoUsuario("");
+    const nome = novoNomeUser.trim();
+    if (!nome || !novaSenhaUser) {
+      setErroNovoUsuario("Preencha nome e senha.");
+      return;
+    }
+    if (usuarios.some((u) => u.nome.toLowerCase() === nome.toLowerCase())) {
+      setErroNovoUsuario("Já existe um usuário com esse nome.");
+      return;
+    }
+    const senhaHash = await hashSenha(novaSenhaUser);
+    await addDoc(collection(db, "usuarios"), { nome, senhaHash, admin: novoUserAdmin });
+    setNovoNomeUser("");
+    setNovaSenhaUser("");
+    setNovoUserAdmin(false);
+    setErroNovoUsuario("");
+    setOkNovoUsuario(`Usuário "${nome}" cadastrado.`);
   }
 
   async function confirmarLogin(e) {
@@ -504,7 +531,7 @@ export default function App() {
             <p style={{ marginTop: 0, fontWeight: 600 }}>Quem é você?</p>
             {usuarios.length === 0 && (
               <p style={{ fontSize: "13px", color: "#6b6252" }}>
-                Ainda não há usuários cadastrados. Cadastre o primeiro abaixo.
+                Ainda não há usuários cadastrados. Cadastre o primeiro administrador abaixo.
               </p>
             )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
@@ -525,30 +552,36 @@ export default function App() {
             </div>
           </div>
 
-          <div style={card}>
-            <p style={{ marginTop: 0, fontWeight: 600 }}>Cadastrar novo usuário</p>
-            <form onSubmit={cadastrarUsuario}>
-              <label style={label}>Nome do atendente</label>
-              <input
-                style={input}
-                value={novoNome}
-                onChange={(e) => setNovoNome(e.target.value)}
-                placeholder="Ex: Maria"
-              />
-              <label style={label}>Senha</label>
-              <input
-                style={input}
-                type="password"
-                value={novaSenha}
-                onChange={(e) => setNovaSenha(e.target.value)}
-                placeholder="Escolha uma senha"
-              />
-              {erro && <p style={{ color: "#8a1f1f", fontSize: "13px", marginTop: "-8px" }}>{erro}</p>}
-              <button style={btnPrimary} type="submit">
-                Cadastrar e entrar
-              </button>
-            </form>
-          </div>
+          {usuarios.length === 0 ? (
+            <div style={card}>
+              <p style={{ marginTop: 0, fontWeight: 600 }}>Cadastrar administrador</p>
+              <form onSubmit={cadastrarUsuario}>
+                <label style={label}>Nome do atendente</label>
+                <input
+                  style={input}
+                  value={novoNome}
+                  onChange={(e) => setNovoNome(e.target.value)}
+                  placeholder="Ex: Maria"
+                />
+                <label style={label}>Senha</label>
+                <input
+                  style={input}
+                  type="password"
+                  value={novaSenha}
+                  onChange={(e) => setNovaSenha(e.target.value)}
+                  placeholder="Escolha uma senha"
+                />
+                {erro && <p style={{ color: "#8a1f1f", fontSize: "13px", marginTop: "-8px" }}>{erro}</p>}
+                <button style={btnPrimary} type="submit">
+                  Cadastrar e entrar
+                </button>
+              </form>
+            </div>
+          ) : (
+            <p style={{ fontSize: "12px", color: "#8a7f68", textAlign: "center" }}>
+              Não encontrou seu nome? Peça para um administrador cadastrar seu usuário.
+            </p>
+          )}
           <p style={{ fontSize: "12px", color: "#8a7f68", textAlign: "center" }}>
             Os dados ficam salvos no banco de dados e visíveis para todos que acessarem este site.
           </p>
@@ -964,6 +997,56 @@ export default function App() {
                   </p>
                 </div>
               ))}
+            </div>
+
+            <div style={card}>
+              <p style={{ marginTop: 0, fontWeight: 600 }}>Cadastrar novo usuário</p>
+              <p style={{ fontSize: "13px", color: "#6b6252", marginTop: "-6px" }}>
+                Só administradores podem cadastrar novos atendentes.
+              </p>
+              <form onSubmit={criarUsuario}>
+                <label style={label}>Nome do atendente</label>
+                <input
+                  style={input}
+                  value={novoNomeUser}
+                  onChange={(e) => setNovoNomeUser(e.target.value)}
+                  placeholder="Ex: Maria"
+                />
+                <label style={label}>Senha</label>
+                <input
+                  style={input}
+                  type="password"
+                  value={novaSenhaUser}
+                  onChange={(e) => setNovaSenhaUser(e.target.value)}
+                  placeholder="Escolha uma senha"
+                />
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "13px",
+                    marginBottom: "14px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={novoUserAdmin}
+                    onChange={(e) => setNovoUserAdmin(e.target.checked)}
+                  />
+                  Tornar administrador
+                </label>
+                {erroNovoUsuario && (
+                  <p style={{ color: "#8a1f1f", fontSize: "13px", marginTop: "-8px" }}>{erroNovoUsuario}</p>
+                )}
+                {okNovoUsuario && (
+                  <p style={{ color: "#2f5240", fontSize: "13px", marginTop: "-8px" }}>{okNovoUsuario}</p>
+                )}
+                <button style={btnPrimary} type="submit">
+                  Cadastrar usuário
+                </button>
+              </form>
             </div>
 
             <div style={card}>
