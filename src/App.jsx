@@ -160,6 +160,7 @@ export default function App() {
   const [excluirConfirmId, setExcluirConfirmId] = useState(null);
 
   const [confirmandoRecebimentoId, setConfirmandoRecebimentoId] = useState(null);
+  const [valorRecebido, setValorRecebido] = useState("");
   const [obsRecebimento, setObsRecebimento] = useState("");
   const [fotoRecebimento, setFotoRecebimento] = useState(null);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
@@ -406,8 +407,9 @@ export default function App() {
     setTab("pendentes");
   }
 
-  function iniciarConfirmacaoRecebimento(id) {
-    setConfirmandoRecebimentoId(id);
+  function iniciarConfirmacaoRecebimento(r) {
+    setConfirmandoRecebimentoId(r.id);
+    setValorRecebido(String(r.valor));
     setObsRecebimento("");
     setFotoRecebimento(null);
     setErroRecebimento("");
@@ -415,6 +417,7 @@ export default function App() {
 
   function cancelarConfirmacaoRecebimento() {
     setConfirmandoRecebimentoId(null);
+    setValorRecebido("");
     setObsRecebimento("");
     setFotoRecebimento(null);
     setErroRecebimento("");
@@ -456,11 +459,23 @@ export default function App() {
     }
   }
 
-  async function confirmarRecebimento(id) {
-    await updateDoc(doc(db, "registros", id), {
+  async function confirmarRecebimento(r) {
+    if (!valorRecebido || Number(valorRecebido) <= 0) {
+      setErroRecebimento("Informe o valor recebido.");
+      return;
+    }
+    const valorBate = Number(valorRecebido) === Number(r.valor);
+    if (!valorBate && !obsRecebimento.trim()) {
+      setErroRecebimento(
+        "O valor recebido é diferente do registrado. Explique o motivo na observação."
+      );
+      return;
+    }
+    await updateDoc(doc(db, "registros", r.id), {
       status: "recebido",
       recebidoPor: currentUser.nome,
       recebidoEm: new Date().toISOString(),
+      valorRecebido: Number(valorRecebido),
       observacao: obsRecebimento.trim() || null,
       fotoRecebimento: fotoRecebimento || null,
     });
@@ -472,6 +487,7 @@ export default function App() {
       status: "pendente",
       recebidoPor: null,
       recebidoEm: null,
+      valorRecebido: null,
       observacao: null,
       fotoRecebimento: null,
     });
@@ -1080,7 +1096,21 @@ export default function App() {
                     </p>
                     <span style={tagOrigem(r.origem)}>{r.origem}</span>
                     <p style={{ margin: "14px 0 0", fontWeight: 600, fontSize: "13px" }}>Confirmar recebimento</p>
-                    <label style={label}>Observação (opcional)</label>
+                    <label style={label}>Valor recebido</label>
+                    <input
+                      style={input}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={valorRecebido}
+                      onChange={(e) => setValorRecebido(e.target.value)}
+                    />
+                    {valorRecebido !== "" && Number(valorRecebido) !== Number(r.valor) && (
+                      <p style={{ color: "#8a1f1f", fontSize: "13px", marginTop: "-8px", marginBottom: "14px" }}>
+                        Valor diferente do registrado ({fmtMoney(r.valor)}). Explique o motivo na observação.
+                      </p>
+                    )}
+                    <label style={label}>Observação {Number(valorRecebido) === Number(r.valor) && "(opcional)"}</label>
                     <input
                       style={input}
                       value={obsRecebimento}
@@ -1111,7 +1141,7 @@ export default function App() {
                       <p style={{ color: "#8a1f1f", fontSize: "13px" }}>{erroRecebimento}</p>
                     )}
                     <div style={{ display: "flex", gap: "10px" }}>
-                      <button style={btnStamp} onClick={() => confirmarRecebimento(r.id)}>
+                      <button style={btnStamp} onClick={() => confirmarRecebimento(r)}>
                         CONFIRMAR RECEBIMENTO
                       </button>
                       <button
@@ -1133,7 +1163,7 @@ export default function App() {
                     <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px", marginBottom: "12px" }}>
                       Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
                     </p>
-                    <button style={btnStamp} onClick={() => iniciarConfirmacaoRecebimento(r.id)}>
+                    <button style={btnStamp} onClick={() => iniciarConfirmacaoRecebimento(r)}>
                       DAR RECEBIDO
                     </button>
                     {botoesAdminRegistro(r)}
@@ -1163,6 +1193,11 @@ export default function App() {
                       {fmtMoney(r.valor)}
                     </p>
                     <span style={tagOrigem(r.origem)}>{r.origem}</span>
+                    {r.valorRecebido != null && Number(r.valorRecebido) !== Number(r.valor) && (
+                      <p style={{ fontSize: "13px", color: "#8a1f1f", fontWeight: 700, margin: "6px 0 0" }}>
+                        Valor recebido: {fmtMoney(r.valorRecebido)}
+                      </p>
+                    )}
                     <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px" }}>
                       Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
                       <br />
