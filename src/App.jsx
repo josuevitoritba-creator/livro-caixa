@@ -464,13 +464,6 @@ export default function App() {
       setErroRecebimento("Informe o valor recebido.");
       return;
     }
-    const valorBate = Number(valorRecebido) === Number(r.valor);
-    if (!valorBate && !obsRecebimento.trim()) {
-      setErroRecebimento(
-        "O valor recebido é diferente do registrado. Explique o motivo na observação."
-      );
-      return;
-    }
     await updateDoc(doc(db, "registros", r.id), {
       status: "recebido",
       recebidoPor: currentUser.nome,
@@ -1110,7 +1103,7 @@ export default function App() {
                         Valor diferente do registrado ({fmtMoney(r.valor)}). Explique o motivo na observação.
                       </p>
                     )}
-                    <label style={label}>Observação {Number(valorRecebido) === Number(r.valor) && "(opcional)"}</label>
+                    <label style={label}>Observação (opcional)</label>
                     <input
                       style={input}
                       value={obsRecebimento}
