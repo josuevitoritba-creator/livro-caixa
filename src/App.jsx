@@ -159,6 +159,12 @@ export default function App() {
   const [erroEdicao, setErroEdicao] = useState("");
   const [excluirConfirmId, setExcluirConfirmId] = useState(null);
 
+  const [confirmandoRecebimentoId, setConfirmandoRecebimentoId] = useState(null);
+  const [obsRecebimento, setObsRecebimento] = useState("");
+  const [fotoRecebimento, setFotoRecebimento] = useState(null);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [erroRecebimento, setErroRecebimento] = useState("");
+
   const [filtroCaixa, setFiltroCaixa] = useState("Todos");
   const [filtroOrigem, setFiltroOrigem] = useState("Todos");
 
@@ -400,11 +406,74 @@ export default function App() {
     setTab("pendentes");
   }
 
-  async function darRecebido(id) {
+  function iniciarConfirmacaoRecebimento(id) {
+    setConfirmandoRecebimentoId(id);
+    setObsRecebimento("");
+    setFotoRecebimento(null);
+    setErroRecebimento("");
+  }
+
+  function cancelarConfirmacaoRecebimento() {
+    setConfirmandoRecebimentoId(null);
+    setObsRecebimento("");
+    setFotoRecebimento(null);
+    setErroRecebimento("");
+  }
+
+  function processarFoto(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxLado = 900;
+          const escala = Math.min(1, maxLado / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width * escala;
+          canvas.height = img.height * escala;
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.6));
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function selecionarFoto(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEnviandoFoto(true);
+    setErroRecebimento("");
+    try {
+      setFotoRecebimento(await processarFoto(file));
+    } catch {
+      setErroRecebimento("Não foi possível carregar a foto.");
+    } finally {
+      setEnviandoFoto(false);
+    }
+  }
+
+  async function confirmarRecebimento(id) {
     await updateDoc(doc(db, "registros", id), {
       status: "recebido",
       recebidoPor: currentUser.nome,
       recebidoEm: new Date().toISOString(),
+      observacao: obsRecebimento.trim() || null,
+      fotoRecebimento: fotoRecebimento || null,
+    });
+    cancelarConfirmacaoRecebimento();
+  }
+
+  async function cancelarRecebimento(id) {
+    await updateDoc(doc(db, "registros", id), {
+      status: "pendente",
+      recebidoPor: null,
+      recebidoEm: null,
+      observacao: null,
+      fotoRecebimento: null,
     });
   }
 
@@ -605,7 +674,7 @@ export default function App() {
     );
   }
 
-  function botoesAdminRegistro(r) {
+  function botoesAdminRegistro(r, mostrarCancelarRecebimento = false) {
     if (!currentUser.admin) return null;
     return (
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "10px" }}>
@@ -623,6 +692,22 @@ export default function App() {
         >
           Editar
         </button>
+        {mostrarCancelarRecebimento && (
+          <button
+            type="button"
+            onClick={() => cancelarRecebimento(r.id)}
+            style={{
+              ...btnPrimary,
+              background: "#fff",
+              color: "#7a4d1f",
+              border: "1px solid #7a4d1f",
+              padding: "7px 12px",
+              fontSize: "12px",
+            }}
+          >
+            Cancelar recebimento
+          </button>
+        )}
         {excluirConfirmId === r.id ? (
           <>
             <button type="button" onClick={() => excluirRegistro(r.id)} style={{ ...btnStamp, padding: "7px 12px" }}>
@@ -987,6 +1072,57 @@ export default function App() {
               <div key={r.id} style={card}>
                 {editandoId === r.id ? (
                   formEdicaoRegistro(r)
+                ) : confirmandoRecebimentoId === r.id ? (
+                  <>
+                    <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>{r.caixa}</p>
+                    <p style={{ margin: "0 0 6px", fontFamily: "'Courier New', monospace", fontSize: "20px" }}>
+                      {fmtMoney(r.valor)}
+                    </p>
+                    <span style={tagOrigem(r.origem)}>{r.origem}</span>
+                    <p style={{ margin: "14px 0 0", fontWeight: 600, fontSize: "13px" }}>Confirmar recebimento</p>
+                    <label style={label}>Observação (opcional)</label>
+                    <input
+                      style={input}
+                      value={obsRecebimento}
+                      onChange={(e) => setObsRecebimento(e.target.value)}
+                      placeholder="Ex: recebido em dinheiro"
+                    />
+                    <label style={label}>Foto (opcional)</label>
+                    <input
+                      style={{ ...input, padding: "8px" }}
+                      type="file"
+                      accept="image/*"
+                      onChange={selecionarFoto}
+                    />
+                    {enviandoFoto && <p style={{ fontSize: "12px", color: "#6b6252" }}>Carregando foto…</p>}
+                    {fotoRecebimento && (
+                      <img
+                        src={fotoRecebimento}
+                        alt="Foto do recebimento"
+                        style={{
+                          maxWidth: "100%",
+                          borderRadius: "4px",
+                          marginBottom: "10px",
+                          border: "1px solid #cfc6ae",
+                        }}
+                      />
+                    )}
+                    {erroRecebimento && (
+                      <p style={{ color: "#8a1f1f", fontSize: "13px" }}>{erroRecebimento}</p>
+                    )}
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <button style={btnStamp} onClick={() => confirmarRecebimento(r.id)}>
+                        CONFIRMAR RECEBIMENTO
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelarConfirmacaoRecebimento}
+                        style={{ ...btnPrimary, background: "#fff", color: "#1f3d33", border: "1px solid #1f3d33" }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>{r.caixa}</p>
@@ -997,7 +1133,7 @@ export default function App() {
                     <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px", marginBottom: "12px" }}>
                       Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
                     </p>
-                    <button style={btnStamp} onClick={() => darRecebido(r.id)}>
+                    <button style={btnStamp} onClick={() => iniciarConfirmacaoRecebimento(r.id)}>
                       DAR RECEBIDO
                     </button>
                     {botoesAdminRegistro(r)}
@@ -1032,7 +1168,22 @@ export default function App() {
                       <br />
                       Recebido por <strong>{r.recebidoPor}</strong> em {fmtDateTime(r.recebidoEm)}
                     </p>
-                    {botoesAdminRegistro(r)}
+                    {r.observacao && (
+                      <p style={{ fontSize: "13px", marginTop: "8px", fontStyle: "italic" }}>“{r.observacao}”</p>
+                    )}
+                    {r.fotoRecebimento && (
+                      <img
+                        src={r.fotoRecebimento}
+                        alt="Foto do recebimento"
+                        style={{
+                          maxWidth: "100%",
+                          borderRadius: "4px",
+                          marginTop: "8px",
+                          border: "1px solid #cfc6ae",
+                        }}
+                      />
+                    )}
+                    {botoesAdminRegistro(r, true)}
                   </>
                 )}
               </div>
