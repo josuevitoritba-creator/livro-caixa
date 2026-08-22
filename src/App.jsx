@@ -277,11 +277,16 @@ export default function App() {
   const recebidosAgrupados = useMemo(() => {
     const map = {};
     recebidos.forEach((r) => {
-      const key = diaKey(r.recebidoEm);
+      const key = diaKey(r.registradoEm);
       if (!map[key]) map[key] = [];
       map[key].push(r);
     });
-    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
+    return Object.entries(map)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, itens]) => [
+        key,
+        itens.slice().sort((a, b) => (b.registradoEm || "").localeCompare(a.registradoEm || "")),
+      ]);
   }, [recebidos]);
 
   const registrosSelecionados = useMemo(
