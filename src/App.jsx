@@ -274,6 +274,16 @@ export default function App() {
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
   }, [recebidos]);
 
+  const recebidosAgrupados = useMemo(() => {
+    const map = {};
+    recebidos.forEach((r) => {
+      const key = diaKey(r.recebidoEm);
+      if (!map[key]) map[key] = [];
+      map[key].push(r);
+    });
+    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [recebidos]);
+
   const registrosSelecionados = useMemo(
     () => recebidos.filter((r) => datasSelecionadas.includes(diaKey(r.recebidoEm))),
     [recebidos, datasSelecionadas]
@@ -1174,46 +1184,75 @@ export default function App() {
                 Ainda não há recebimentos confirmados.
               </p>
             )}
-            {recebidos.map((r) => (
-              <div key={r.id} style={{ ...card, overflow: "hidden" }}>
-                {editandoId === r.id ? (
-                  formEdicaoRegistro(r)
-                ) : (
-                  <>
-                    <Stamp />
-                    <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>{r.caixa}</p>
-                    <p style={{ margin: "0 0 6px", fontFamily: "'Courier New', monospace", fontSize: "20px" }}>
-                      {fmtMoney(r.valor)}
-                    </p>
-                    <span style={tagOrigem(r.origem)}>{r.origem}</span>
-                    {r.valorRecebido != null && Number(r.valorRecebido) !== Number(r.valor) && (
-                      <p style={{ fontSize: "13px", color: "#8a1f1f", fontWeight: 700, margin: "6px 0 0" }}>
-                        Valor recebido: {fmtMoney(r.valorRecebido)}
-                      </p>
+            {recebidosAgrupados.map(([key, itens]) => (
+              <div key={key} style={{ marginBottom: "22px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                    borderBottom: "2px solid #1f3d33",
+                    paddingBottom: "6px",
+                    marginBottom: "12px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "Georgia, 'Times New Roman', serif",
+                      fontSize: "16px",
+                      fontWeight: 700,
+                      color: "#1f3d33",
+                    }}
+                  >
+                    {diaLabel(key)}
+                  </span>
+                  <span style={{ fontSize: "12px", color: "#6b6252", fontFamily: "'Courier New', monospace" }}>
+                    {itens.length} recebimento{itens.length === 1 ? "" : "s"} ·{" "}
+                    {fmtMoney(itens.reduce((s, r) => s + Number(r.valor), 0))}
+                  </span>
+                </div>
+                {itens.map((r) => (
+                  <div key={r.id} style={{ ...card, overflow: "hidden" }}>
+                    {editandoId === r.id ? (
+                      formEdicaoRegistro(r)
+                    ) : (
+                      <>
+                        <Stamp />
+                        <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>{r.caixa}</p>
+                        <p style={{ margin: "0 0 6px", fontFamily: "'Courier New', monospace", fontSize: "20px" }}>
+                          {fmtMoney(r.valor)}
+                        </p>
+                        <span style={tagOrigem(r.origem)}>{r.origem}</span>
+                        {r.valorRecebido != null && Number(r.valorRecebido) !== Number(r.valor) && (
+                          <p style={{ fontSize: "13px", color: "#8a1f1f", fontWeight: 700, margin: "6px 0 0" }}>
+                            Valor recebido: {fmtMoney(r.valorRecebido)}
+                          </p>
+                        )}
+                        <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px" }}>
+                          Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
+                          <br />
+                          Recebido por <strong>{r.recebidoPor}</strong> em {fmtDateTime(r.recebidoEm)}
+                        </p>
+                        {r.observacao && (
+                          <p style={{ fontSize: "13px", marginTop: "8px", fontStyle: "italic" }}>“{r.observacao}”</p>
+                        )}
+                        {r.fotoRecebimento && (
+                          <img
+                            src={r.fotoRecebimento}
+                            alt="Foto do recebimento"
+                            style={{
+                              maxWidth: "100%",
+                              borderRadius: "4px",
+                              marginTop: "8px",
+                              border: "1px solid #cfc6ae",
+                            }}
+                          />
+                        )}
+                        {botoesAdminRegistro(r, true)}
+                      </>
                     )}
-                    <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px" }}>
-                      Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
-                      <br />
-                      Recebido por <strong>{r.recebidoPor}</strong> em {fmtDateTime(r.recebidoEm)}
-                    </p>
-                    {r.observacao && (
-                      <p style={{ fontSize: "13px", marginTop: "8px", fontStyle: "italic" }}>“{r.observacao}”</p>
-                    )}
-                    {r.fotoRecebimento && (
-                      <img
-                        src={r.fotoRecebimento}
-                        alt="Foto do recebimento"
-                        style={{
-                          maxWidth: "100%",
-                          borderRadius: "4px",
-                          marginTop: "8px",
-                          border: "1px solid #cfc6ae",
-                        }}
-                      />
-                    )}
-                    {botoesAdminRegistro(r, true)}
-                  </>
-                )}
+                  </div>
+                ))}
               </div>
             ))}
           </>
