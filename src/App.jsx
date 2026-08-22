@@ -257,7 +257,7 @@ export default function App() {
 
   const totalFiltrado = registrosFiltrados.reduce((s, r) => s + Number(r.valor), 0);
 
-  const diaKey = (iso) => (iso || "").slice(0, 10);
+  const diaKey = (iso) => dataLocalDeISO(iso);
   const diaLabel = (key) => {
     const [y, m, d] = key.split("-");
     return `${d}/${m}/${y}`;
