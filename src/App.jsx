@@ -1371,6 +1371,8 @@ export default function App() {
                 <span style={tagOrigem(r.origem)}>{r.origem}</span>
                 <DetalhesExtras registro={r} onAmpliarFoto={setFotoAmpliada} />
                 <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px", marginBottom: "12px" }}>
+                  Data do caixa: <strong>{diaLabel(dataRefDe(r))}</strong>
+                  <br />
                   Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
                 </p>
                 {recebendoDiferenteId === r.id ? (
@@ -1477,6 +1479,8 @@ export default function App() {
                     <span style={tagOrigem(r.origem)}>{r.origem}</span>
                     <DetalhesExtras registro={r} onAmpliarFoto={setFotoAmpliada} />
                     <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px" }}>
+                      Data do caixa: <strong>{diaLabel(dataRefDe(r))}</strong>
+                      <br />
                       Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
                       <br />
                       Recebido por <strong>{r.recebidoPor}</strong> em {fmtDateTime(r.recebidoEm)}
@@ -1656,6 +1660,8 @@ export default function App() {
                       )}
                       <DetalhesExtras registro={r} onAmpliarFoto={setFotoAmpliada} />
                       <p style={{ fontSize: "12px", color: "#6b6252", margin: "8px 0 0" }}>
+                        Data do caixa: <strong>{diaLabel(dataRefDe(r))}</strong>
+                        <br />
                         Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
                         {r.status === "recebido" && (
                           <>
@@ -1762,6 +1768,8 @@ export default function App() {
                 )}
                 <DetalhesExtras registro={r} onAmpliarFoto={setFotoAmpliada} />
                 <p style={{ fontSize: "12px", color: "#6b6252", margin: "8px 0 0" }}>
+                  Data do caixa: <strong>{diaLabel(dataRefDe(r))}</strong>
+                  <br />
                   Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
                   <br />
                   Recebido por <strong>{r.recebidoPor}</strong> em {fmtDateTime(r.recebidoEm)}
@@ -1921,6 +1929,8 @@ export default function App() {
                       <span style={tagOrigem(r.origem)}>{r.origem}</span>
                       <DetalhesExtras registro={r} onAmpliarFoto={setFotoAmpliada} />
                       <p style={{ fontSize: "12px", color: "#6b6252", margin: "8px 0 0" }}>
+                        Data do caixa: <strong>{diaLabel(dataRefDe(r))}</strong>
+                        <br />
                         Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
                         <br />
                         Recebido por <strong>{r.recebidoPor}</strong> em {fmtDateTime(r.recebidoEm)}
@@ -2003,6 +2013,8 @@ export default function App() {
                             <span style={tagOrigem(r.origem)}>{r.origem}</span>
                             <DetalhesExtras registro={r} onAmpliarFoto={setFotoAmpliada} />
                             <p style={{ fontSize: "12px", color: "#6b6252", margin: "8px 0 0" }}>
+                              Data do caixa: <strong>{diaLabel(dataRefDe(r))}</strong>
+                              <br />
                               Registrado por <strong>{r.registradoPor}</strong> em {fmtDateTime(r.registradoEm)}
                               <br />
                               Recebido por <strong>{r.recebidoPor}</strong> em {fmtDateTime(r.recebidoEm)}
