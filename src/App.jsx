@@ -299,6 +299,12 @@ export default function App() {
   const [conferenciaAberta, setConferenciaAberta] = useState(null);
   const [filtroConferencia, setFiltroConferencia] = useState("Todos");
 
+  // edição / exclusão de lançamentos
+  const [editandoId, setEditandoId] = useState(null);
+  const [edForm, setEdForm] = useState(null);
+  const [erroEdicao, setErroEdicao] = useState("");
+  const [excluindoId, setExcluindoId] = useState(null);
+
   // ---------- sincronização em tempo real com o Firestore ----------
   useEffect(() => {
     const unsubUsuarios = onSnapshot(collection(db, "usuarios"), (snap) => {
@@ -622,6 +628,186 @@ export default function App() {
     await darRecebido(r, valorRecebidoInput);
     setRecebendoDiferenteId(null);
     setValorRecebidoInput("");
+  }
+
+  // Quem pode editar/excluir: só o admin, e nunca um lançamento já conferido.
+  function podeMexer(r) {
+    return !!currentUser?.admin && !r.conferido;
+  }
+
+  function abrirEdicao(r) {
+    setExcluindoId(null);
+    setErroEdicao("");
+    setEditandoId(r.id);
+    setEdForm({
+      caixa: r.caixa,
+      dataRef: dataRefDe(r),
+      valor: String(r.valor),
+      origem: r.origem,
+      observacao: r.observacao || "",
+      valorRecebido: r.valorRecebido != null ? String(r.valorRecebido) : String(r.valor),
+      removerFoto: false,
+    });
+  }
+
+  function cancelarEdicao() {
+    setEditandoId(null);
+    setEdForm(null);
+    setErroEdicao("");
+  }
+
+  async function salvarEdicao(r) {
+    const f = edForm;
+    if (!f.caixa.trim() || !f.dataRef || !f.valor || Number(f.valor) <= 0) {
+      setErroEdicao("Preencha o caixa, a data e um valor válido.");
+      return;
+    }
+    const mudancas = {
+      caixa: f.caixa.trim(),
+      dataRef: f.dataRef,
+      valor: arred(Number(f.valor)),
+      origem: f.origem,
+      observacao: f.observacao.trim(),
+      editadoPor: currentUser.nome,
+      editadoEm: new Date().toISOString(),
+    };
+    if (f.removerFoto) mudancas.foto = null;
+    if (r.status === "recebido") {
+      if (f.valorRecebido === "" || Number(f.valorRecebido) < 0 || Number.isNaN(Number(f.valorRecebido))) {
+        setErroEdicao("Informe o valor recebido.");
+        return;
+      }
+      mudancas.valorRecebido = arred(Number(f.valorRecebido));
+    }
+    try {
+      await updateDoc(doc(db, "registros", r.id), mudancas);
+      cancelarEdicao();
+    } catch (err) {
+      setErroEdicao("Não foi possível salvar. Tente de novo.");
+    }
+  }
+
+  async function excluirRegistro(r) {
+    try {
+      await deleteDoc(doc(db, "registros", r.id));
+      setExcluindoId(null);
+    } catch (err) {
+      setErroEdicao("Não foi possível excluir. Tente de novo.");
+    }
+  }
+
+  // botões Editar/Excluir + formulário de edição de um lançamento
+  function renderAcoes(r) {
+    if (!podeMexer(r)) return null;
+    if (editandoId === r.id && edForm) {
+      const set = (campo) => (e) => setEdForm({ ...edForm, [campo]: e.target.value });
+      return (
+        <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px dashed #c9bfa6" }}>
+          <p style={{ margin: "0 0 8px", fontWeight: 600, fontSize: "13px" }}>Editando lançamento</p>
+          <label style={label}>Caixa</label>
+          <select style={input} value={edForm.caixa} onChange={set("caixa")}>
+            {[...new Set([...nomesCaixaExistentes, edForm.caixa])].map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <label style={label}>Data do caixa</label>
+          <input style={input} type="date" value={edForm.dataRef} onChange={set("dataRef")} />
+          <label style={label}>Origem</label>
+          <select style={input} value={edForm.origem} onChange={set("origem")}>
+            {ORIGENS.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+          <label style={label}>Valor lançado (R$)</label>
+          <input style={input} type="number" min="0" step="0.01" value={edForm.valor} onChange={set("valor")} />
+          {r.status === "recebido" && (
+            <>
+              <label style={label}>Valor recebido (R$)</label>
+              <input
+                style={input}
+                type="number"
+                min="0"
+                step="0.01"
+                value={edForm.valorRecebido}
+                onChange={set("valorRecebido")}
+              />
+            </>
+          )}
+          <label style={label}>Observação</label>
+          <input style={input} type="text" value={edForm.observacao} onChange={set("observacao")} />
+          {r.foto && (
+            <label style={{ ...label, display: "flex", gap: "8px", alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={edForm.removerFoto}
+                onChange={(e) => setEdForm({ ...edForm, removerFoto: e.target.checked })}
+              />
+              Remover a foto
+            </label>
+          )}
+          {erroEdicao && <p style={{ color: "#8a1f1f", fontSize: "13px" }}>{erroEdicao}</p>}
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button style={btnStamp} onClick={() => salvarEdicao(r)}>
+              SALVAR
+            </button>
+            <button
+              style={{ ...btnPrimary, background: "#fff", color: "#1f3d33", border: "1px solid #1f3d33" }}
+              onClick={cancelarEdicao}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      );
+    }
+    if (excluindoId === r.id) {
+      return (
+        <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px dashed #c9bfa6" }}>
+          <p style={{ margin: "0 0 8px", fontSize: "13px", fontWeight: 700, color: "#8a1f1f" }}>
+            Excluir este lançamento de {fmtMoney(r.valor)}? Não dá para desfazer.
+          </p>
+          {erroEdicao && <p style={{ color: "#8a1f1f", fontSize: "13px" }}>{erroEdicao}</p>}
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button style={btnStamp} onClick={() => excluirRegistro(r)}>
+              SIM, EXCLUIR
+            </button>
+            <button
+              style={{ ...btnPrimary, background: "#fff", color: "#1f3d33", border: "1px solid #1f3d33" }}
+              onClick={() => {
+                setExcluindoId(null);
+                setErroEdicao("");
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div style={{ display: "flex", gap: "14px", marginTop: "12px" }}>
+        <button
+          style={{ background: "none", border: "none", color: "#1f3d33", textDecoration: "underline", cursor: "pointer", fontSize: "13px", padding: 0 }}
+          onClick={() => abrirEdicao(r)}
+        >
+          Editar
+        </button>
+        <button
+          style={{ background: "none", border: "none", color: "#8a1f1f", textDecoration: "underline", cursor: "pointer", fontSize: "13px", padding: 0 }}
+          onClick={() => {
+            cancelarEdicao();
+            setErroEdicao("");
+            setExcluindoId(r.id);
+          }}
+        >
+          Excluir
+        </button>
+      </div>
+    );
   }
 
   // Marca os lançamentos como conferidos. NADA é apagado.
@@ -1241,6 +1427,7 @@ export default function App() {
                     </button>
                   </div>
                 )}
+                {renderAcoes(r)}
               </div>
             ))}
           </>
@@ -1299,7 +1486,14 @@ export default function App() {
                           Conferido por <strong>{r.conferidoPor}</strong> em {fmtDateTime(r.conferidoEm)}
                         </>
                       )}
+                      {r.editadoPor && (
+                        <>
+                          <br />
+                          Editado por <strong>{r.editadoPor}</strong> em {fmtDateTime(r.editadoEm)}
+                        </>
+                      )}
                     </p>
+                    {renderAcoes(r)}
                   </div>
                 ))}
               </div>
