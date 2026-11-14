@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 
 // ---------- constantes ----------
-const ORIGENS = ["Troco", "Caixa do dia", "Depósito"];
+const ORIGENS = ["Troco", "Caixa do dia", "Depósito", "Saldo anterior"];
 const CAIXAS_PADRAO = ["Saborey - Balcão", "Saborey - Delivery", "Holy"];
 
 // Regra de lançamentos obrigatórios por dia: todo dia, exceto a folga semanal,
@@ -210,7 +210,7 @@ function DetalhesExtras({ registro, onAmpliarFoto }) {
   );
 }
 
-// Valor recebido - Troco - Depósito = Saldo no caixa
+// Saldo anterior + Valor recebido - Troco - Depósito = Saldo no caixa
 function BlocoCalculo({ dados, compacto = false }) {
   const linha = {
     display: "flex",
@@ -221,8 +221,14 @@ function BlocoCalculo({ dados, compacto = false }) {
   const mono = { fontFamily: "'Courier New', monospace" };
   return (
     <div>
+      {dados.saldoAnterior != null && (
+        <div style={linha}>
+          <span>Saldo anterior</span>
+          <span style={mono}>{fmtMoney(dados.saldoAnterior)}</span>
+        </div>
+      )}
       <div style={linha}>
-        <span>Valor recebido (Caixa do dia)</span>
+        <span>{dados.saldoAnterior != null ? "(+) " : ""}Valor recebido (Caixa do dia)</span>
         <span style={mono}>{fmtMoney(dados.recebido)}</span>
       </div>
       <div style={linha}>
@@ -465,9 +471,9 @@ export default function App() {
     [naoConferidos, datasSelecionadas]
   );
 
-  // Valor recebido (origem "Caixa do dia") - Troco - Depósito = Saldo no caixa
+  // Saldo anterior + Valor recebido (origem "Caixa do dia") - Troco - Depósito = Saldo no caixa
   const calcularConferencia = (lista) => {
-    const novo = () => ({ recebido: 0, troco: 0, deposito: 0, saldo: 0 });
+    const novo = () => ({ saldoAnterior: 0, recebido: 0, troco: 0, deposito: 0, saldo: 0 });
     const total = novo();
     const porCaixa = {};
     lista.forEach((r) => {
@@ -476,14 +482,16 @@ export default function App() {
       [total, porCaixa[r.caixa]].forEach((a) => {
         if (r.origem === "Troco") a.troco += v;
         else if (r.origem === "Depósito") a.deposito += v;
+        else if (r.origem === "Saldo anterior") a.saldoAnterior += v;
         else a.recebido += v;
       });
     });
     const fechar = (a) => {
+      a.saldoAnterior = arred(a.saldoAnterior);
       a.recebido = arred(a.recebido);
       a.troco = arred(a.troco);
       a.deposito = arred(a.deposito);
-      a.saldo = arred(a.recebido - a.troco - a.deposito);
+      a.saldo = arred(a.saldoAnterior + a.recebido - a.troco - a.deposito);
     };
     fechar(total);
     Object.values(porCaixa).forEach(fechar);
@@ -950,6 +958,7 @@ export default function App() {
     Troco: { background: "#dbe6df", color: "#2f5240" },
     "Caixa do dia": { background: "#f0ddc4", color: "#7a4d1f" },
     "Depósito": { background: "#d9e3f0", color: "#2a4a73" },
+    "Saldo anterior": { background: "#e6dcef", color: "#5a3a7a" },
   };
   const tagOrigem = (o) => ({
     ...tag,
