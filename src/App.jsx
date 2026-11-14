@@ -21,6 +21,7 @@ const CAIXAS_PADRAO = ["Saborey - Balcão", "Saborey - Delivery", "Holy"];
 const FOLGA_SEMANAL = 1; // 0 = domingo, 1 = segunda, ... 6 = sábado
 const CAIXAS_OBRIGATORIOS = CAIXAS_PADRAO;
 const ORIGENS_OBRIGATORIAS = ["Troco", "Caixa do dia"];
+const FALTAS_A_PARTIR_DE = "2026-11-14"; // não cobra lançamentos de dias anteriores a esta data
 const JANELA_FALTAS_DIAS = 30;
 
 // ---------- helpers ----------
@@ -409,7 +410,8 @@ export default function App() {
       return !min || k < min ? k : min;
     }, "");
     const limite = addDias(hoje, -JANELA_FALTAS_DIAS);
-    const inicio = primeiro > limite ? primeiro : limite; // não cobra antes do 1º lançamento
+    // começa no mais recente entre: 1º lançamento, janela de 30 dias e a data de início da cobrança
+    const inicio = [primeiro, limite, FALTAS_A_PARTIR_DE].reduce((a, b) => (a > b ? a : b));
     const resultado = [];
     for (let k = hoje; k >= inicio; k = addDias(k, -1)) {
       if (diaSemana(k) === FOLGA_SEMANAL) continue;
@@ -1485,8 +1487,8 @@ export default function App() {
           <>
             <p style={{ fontSize: "13px", color: "#6b6252", marginTop: 0 }}>
               Regra: todo dia, exceto {NOMES_DIA[FOLGA_SEMANAL]}, precisa ter <strong>Troco</strong> e{" "}
-              <strong>Caixa do dia</strong> de {CAIXAS_OBRIGATORIOS.join(", ")}. Verificando os últimos{" "}
-              {JANELA_FALTAS_DIAS} dias (a partir do primeiro lançamento).
+              <strong>Caixa do dia</strong> de {CAIXAS_OBRIGATORIOS.join(", ")}. Verificando a partir de{" "}
+              {diaLabel(FALTAS_A_PARTIR_DE)}.
             </p>
             {faltas.length === 0 && (
               <div style={card}>
