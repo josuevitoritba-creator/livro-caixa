@@ -310,6 +310,7 @@ export default function App() {
   const [edForm, setEdForm] = useState(null);
   const [erroEdicao, setErroEdicao] = useState("");
   const [excluindoId, setExcluindoId] = useState(null);
+  const [cancelandoId, setCancelandoId] = useState(null);
 
   // ---------- sincronização em tempo real com o Firestore ----------
   useEffect(() => {
@@ -641,6 +642,34 @@ export default function App() {
   // Quem pode editar/excluir: só o admin, e nunca um lançamento já conferido.
   function podeMexer(r) {
     return !!currentUser?.admin && !r.conferido;
+  }
+
+  // Cancelar recebimento: admin ou quem deu o recebimento, desde que ainda não esteja conferido.
+  function podeCancelarRecebimento(r) {
+    if (!currentUser || r.status !== "recebido" || r.conferido) return false;
+    return !!currentUser.admin || r.recebidoPor === currentUser.nome;
+  }
+
+  async function cancelarRecebimento(r) {
+    try {
+      await updateDoc(doc(db, "registros", r.id), {
+        status: "pendente",
+        recebidoPor: null,
+        recebidoEm: null,
+        valorRecebido: null,
+        recebimentoCancelado: {
+          por: currentUser.nome,
+          em: new Date().toISOString(),
+          recebidoPor: r.recebidoPor || null,
+          recebidoEm: r.recebidoEm || null,
+          valorRecebido: r.valorRecebido != null ? Number(r.valorRecebido) : Number(r.valor),
+        },
+      });
+      setCancelandoId(null);
+      setTab("pendentes");
+    } catch (err) {
+      setErroEdicao("Não foi possível cancelar o recebimento. Tente de novo.");
+    }
   }
 
   function abrirEdicao(r) {
@@ -1379,6 +1408,23 @@ export default function App() {
                 </p>
                 <span style={tagOrigem(r.origem)}>{r.origem}</span>
                 <DetalhesExtras registro={r} onAmpliarFoto={setFotoAmpliada} />
+                {r.recebimentoCancelado && (
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "#8a1f1f",
+                      background: "#f6e3e0",
+                      border: "1px solid #e3bcb6",
+                      borderRadius: "3px",
+                      padding: "6px 10px",
+                      margin: "10px 0 0",
+                    }}
+                  >
+                    Recebimento cancelado por <strong>{r.recebimentoCancelado.por}</strong> em{" "}
+                    {fmtDateTime(r.recebimentoCancelado.em)} (havia sido recebido{" "}
+                    {fmtMoney(r.recebimentoCancelado.valorRecebido)} por {r.recebimentoCancelado.recebidoPor})
+                  </p>
+                )}
                 <p style={{ fontSize: "12px", color: "#6b6252", marginTop: "10px", marginBottom: "12px" }}>
                   Data do caixa: <strong>{diaLabel(dataRefDe(r))}</strong>
                   <br />
@@ -1506,6 +1552,44 @@ export default function App() {
                         </>
                       )}
                     </p>
+                    {podeCancelarRecebimento(r) &&
+                      (cancelandoId === r.id ? (
+                        <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px dashed #c9bfa6" }}>
+                          <p style={{ margin: "0 0 8px", fontSize: "13px", fontWeight: 700, color: "#8a1f1f" }}>
+                            Cancelar o recebimento de {fmtMoney(valorEf(r))}? O lançamento volta para Pendentes
+                            para ser recebido de novo.
+                          </p>
+                          {erroEdicao && <p style={{ color: "#8a1f1f", fontSize: "13px" }}>{erroEdicao}</p>}
+                          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                            <button style={btnStamp} onClick={() => cancelarRecebimento(r)}>
+                              SIM, CANCELAR RECEBIMENTO
+                            </button>
+                            <button
+                              style={{ ...btnPrimary, background: "#fff", color: "#1f3d33", border: "1px solid #1f3d33" }}
+                              onClick={() => {
+                                setCancelandoId(null);
+                                setErroEdicao("");
+                              }}
+                            >
+                              Voltar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: "12px" }}>
+                          <button
+                            style={{ ...btnStamp, background: "#fff", color: "#8a1f1f", border: "1px solid #8a1f1f" }}
+                            onClick={() => {
+                              cancelarEdicao();
+                              setExcluindoId(null);
+                              setErroEdicao("");
+                              setCancelandoId(r.id);
+                            }}
+                          >
+                            CANCELAR RECEBIMENTO
+                          </button>
+                        </div>
+                      ))}
                     {renderAcoes(r)}
                   </div>
                 ))}
