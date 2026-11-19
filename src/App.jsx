@@ -18,6 +18,8 @@ const CAIXAS_PADRAO = ["Saborey - Balcão", "Saborey - Delivery", "Holy"];
 
 // Regra de lançamentos obrigatórios por dia: todo dia, exceto a folga semanal,
 // precisa existir Troco e Caixa do dia de cada caixa abaixo.
+// caixas somados num bloco único na Conferência
+const CAIXAS_SABOREY = ["Saborey - Balcão", "Saborey - Delivery"];
 const FOLGA_SEMANAL = 1; // 0 = domingo, 1 = segunda, ... 6 = sábado
 const CAIXAS_OBRIGATORIOS = CAIXAS_PADRAO;
 const ORIGENS_OBRIGATORIAS = ["Troco", "Caixa do dia"];
@@ -208,6 +210,16 @@ function DetalhesExtras({ registro, onAmpliarFoto }) {
       )}
     </div>
   );
+}
+
+// soma os blocos de cálculo de vários caixas num só
+function somarBlocos(lista) {
+  const campos = ["saldoAnterior", "recebido", "troco", "trocoPendente", "deposito", "saldo"];
+  const soma = {};
+  campos.forEach((c) => {
+    soma[c] = arred(lista.reduce((s, d) => s + (Number(d[c]) || 0), 0));
+  });
+  return soma;
 }
 
 // Saldo anterior + Valor recebido - Troco - Troco pendente - Depósito = Saldo no caixa
@@ -1967,6 +1979,28 @@ export default function App() {
                         } no caixa)`}
                   </p>
                 )}
+
+                {(() => {
+                  const pc = resumoSelecao.calculo.porCaixa;
+                  const doSaborey = CAIXAS_SABOREY.filter((n) => pc[n]);
+                  if (doSaborey.length === 0) return null;
+                  return (
+                    <div
+                      style={{
+                        marginTop: "14px",
+                        padding: "10px 12px",
+                        background: "#f0ebd8",
+                        border: "1px solid #c9bfa6",
+                        borderRadius: "4px",
+                      }}
+                    >
+                      <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "14px" }}>
+                        Saborey (Balcão + Delivery) — somado
+                      </p>
+                      <BlocoCalculo dados={somarBlocos(doSaborey.map((n) => pc[n]))} compacto />
+                    </div>
+                  );
+                })()}
 
                 <p style={{ ...label, marginTop: "14px" }}>Por caixa</p>
                 {Object.entries(resumoSelecao.calculo.porCaixa).map(([nome, dados]) => (
