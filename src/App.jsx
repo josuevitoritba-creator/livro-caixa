@@ -210,7 +210,7 @@ function DetalhesExtras({ registro, onAmpliarFoto }) {
   );
 }
 
-// Saldo anterior + Valor recebido - Troco - Depósito = Saldo no caixa
+// Saldo anterior + Valor recebido - Troco - Troco pendente - Depósito = Saldo no caixa
 function BlocoCalculo({ dados, compacto = false }) {
   const linha = {
     display: "flex",
@@ -235,6 +235,12 @@ function BlocoCalculo({ dados, compacto = false }) {
         <span>(−) Total de troco</span>
         <span style={mono}>{fmtMoney(dados.troco)}</span>
       </div>
+      {dados.trocoPendente != null && (
+        <div style={linha}>
+          <span>(−) Troco pendente</span>
+          <span style={mono}>{fmtMoney(dados.trocoPendente)}</span>
+        </div>
+      )}
       <div style={linha}>
         <span>(−) Depósito</span>
         <span style={mono}>{fmtMoney(dados.deposito)}</span>
@@ -473,8 +479,8 @@ export default function App() {
   );
 
   // Saldo anterior + Valor recebido (origem "Caixa do dia") - Troco - Depósito = Saldo no caixa
-  const calcularConferencia = (lista) => {
-    const novo = () => ({ saldoAnterior: 0, recebido: 0, troco: 0, deposito: 0, saldo: 0 });
+  const calcularConferencia = (lista, trocosPendentes = []) => {
+    const novo = () => ({ saldoAnterior: 0, recebido: 0, troco: 0, trocoPendente: 0, deposito: 0, saldo: 0 });
     const total = novo();
     const porCaixa = {};
     lista.forEach((r) => {
@@ -487,12 +493,21 @@ export default function App() {
         else a.recebido += v;
       });
     });
+    // Troco lançado e ainda não recebido: também sai do saldo, em linha separada
+    trocosPendentes.forEach((r) => {
+      const v = Number(r.valor) || 0;
+      if (!porCaixa[r.caixa]) porCaixa[r.caixa] = novo();
+      [total, porCaixa[r.caixa]].forEach((a) => {
+        a.trocoPendente += v;
+      });
+    });
     const fechar = (a) => {
       a.saldoAnterior = arred(a.saldoAnterior);
       a.recebido = arred(a.recebido);
       a.troco = arred(a.troco);
+      a.trocoPendente = arred(a.trocoPendente);
       a.deposito = arred(a.deposito);
-      a.saldo = arred(a.saldoAnterior + a.recebido - a.troco - a.deposito);
+      a.saldo = arred(a.saldoAnterior + a.recebido - a.troco - a.trocoPendente - a.deposito);
     };
     fechar(total);
     Object.values(porCaixa).forEach(fechar);
@@ -500,12 +515,15 @@ export default function App() {
   };
 
   const resumoSelecao = useMemo(() => {
-    const calculo = calcularConferencia(registrosSelecionados);
+    const calculo = calcularConferencia(
+      registrosSelecionados,
+      pendentes.filter((r) => r.origem === "Troco")
+    );
     const somaTotal = arred(registrosSelecionados.reduce((s, r) => s + (valorEf(r) || 0), 0));
     const contado = saldoContado === "" ? null : arred(Number(saldoContado));
     const diferenca = contado === null ? null : arred(contado - calculo.total.saldo);
     return { calculo, somaTotal, contado, diferenca };
-  }, [registrosSelecionados, saldoContado]);
+  }, [registrosSelecionados, saldoContado, pendentes]);
 
   function toggleData(key) {
     setDatasSelecionadas((prev) =>
